@@ -1,0 +1,359 @@
+---
+title: "Campanas verdes en la Ciudad Autónoma de Buenos Aires"
+author: "Gustavo Barbieri"
+date: "2023-05-05"
+output: html_document
+---
+
+# [Proyecto Campanas Verdes]{style="color:green"}
+
+### Pregunta:
+
+Como es la distribución de campanas verdes del gobierno de CABA para mejorar el reciclado en CABA?.
+
+### Objetivo:
+
+Demostrar como es la distribución de campanas verdes en CABA, tanto por Comuna, Barrios, y según población.
+
+
+### Procedimiento:
+
+Para poder responder la pregunta inicial, en primer lugar vamos a tomar la cantidad de campanas verdes que hay por Comuna y Barrio de CABA hasta el año 2021.
+
+Las campanas verdes son aquellos contenedores verdes ubicados en diferentes puntos de la ciudad para la recolección de elementos que se pueden reciclar.
+
+Luego mostraremos la cantidad de población según el censo 2022 también por Comuna y por Barrio de CABA.
+
+Seguido a ello, haremos un cruce de las cantidades de campanas verdes con la población para ver en qué Comunas y en qué Barrios hay mejor relación campanas por población. 
+
+
+#### Segunda etapa
+Luego, en una segunda entrega del trabajo calcularemos la cantidad de lo que se podría reciclar según la cantidad de campanas verdes y lo que se informa que recicla.
+
+
+### Proceso:
+
+#### Fuentes de datos
+
+Para la recopilación de datos se han tomados los datos públicos que brinda la Ciudad Autónoma de Buenos Aires en su página oficial con fecha 2021. Actualmente hay mas de 4500 según la pagina de [ciudad verde]() campanas pero no está actualizado 
+
+-   Fuente: Datos Ciudad Autónoma de Buenos Aires [data.buenosaires.gob.ar](https://data.buenosaires.gob.ar/dataset/campanas-verdes)
+
+-   Fecha de publicación: 10 de Mayo de 2021
+
+-   Fecha de actualización: 22/ de Junio de 2021
+
+### Tareas:
+
+#### Bajar el archivo
+
+Se baja el archivo .csv de la web, cuyo nombre es "campanas-verdes.csv".
+
+#### Copia de seguridad
+
+Se hacer copia de seguridad y se modifica el nombre del archivo para mayor facilidad de trabajo, llamándose ahora campanas_verdes.csv
+
+### En SQLite:
+
+#### Limpieza de datos:
+
+##### Se arreglan nombres.
+
+Ej Gral. Mitre = General Mitre Al ser solo uno se modificó directo en la base.
+
+##### Se arreglan materiales a reciclar
+
+Hay 8 tipo de identificadores de materiales:
+
+```         
+SELECT DISTINCT(materiales)
+  from camverdes
+  
+```
+
+Siendo el carton el que tiene 6 variables. En la pagina web no figura diferentes clases de cartones. Se modifican en base a la información de la pagina. CartonEn / Cartón.n / CartónIn / Cartónln etc
+
+##### Modificando los nombres de los materiales
+
+```         
+update camverdes
+set materiales = "Papel / Cartón / Plástico"
+where materiales = "Papel / CartónEn / Pl"
+```
+
+#### Se modifican dos observaciones.
+
+Se verifica que hay dos obervaciones que estaban mal colocados en la comuna 15, las mismas son dos observaciones de la variable Barrio, a saber: Chacarita indicada en la variable de la comuna 15, cuando pertenece a la comuna 13. Se corrobora con el [mapa de la ciudad de CABA](https://mapa.buenosaires.gob.ar/)
+
+##### Se ordena
+
+Para saber cuantos contenedores hay ordenado por barrio:
+
+```         
+SELECT count (*) as Cantidad, comuna, barrio
+  from camverdes
+  GROUP by barrio
+  ORDER by comuna, barrio
+```
+
+También se ordena por cantidad para saber cuantos contenedores hay por barrio.
+
+```         
+SELECT count(*) AS Cantidad, barrio
+  from camverdes
+  GROUP by barrio
+  ORDER BY Cantidad
+```
+
+### En R:
+
+#### Directorio de trabajo
+
+```{r}
+setwd("C:/Users/gabar/OneDrive/Documentos/R ejercicios/Camverdes")
+```
+
+#### Librerías a utilizar
+
+Para poder manipular los datos con mayor facilidad y realizar gráficos, utilizaremos el paquete tidyverse, se instala la primera vez, y luego se llama la librería con el siguiente código:
+
+```{r, warning=FALSE, message=FALSE}
+#install.packages("tidiverse") #como ya está instalada se deja como comentario.
+library(tidyverse)
+```
+
+Para leer el archivo en R, hay que importarlo, para ello usaremos la función read.csv Para que nos quede asignado a un objeto, en este caso el objeto se llamará: campanas Entonces colocamos el nombre del objeto campanas, utilizamos el signo <- para decirle a R que lo que sigue lo tienen que asignar al objeto de la izquierda, usamos la función read.csv y entre () el nombre del archivo: "camverdes.csv", seguido de los argumentos header = T: es porque el archivo tiene encabezados, sep=",": es porque los separadores del archivo .csv viene en ",".
+
+```{r}
+campanas <- read.csv("camverdes.csv",header = T, sep = ",")
+
+```
+
+Usamos la función names() para traer el nombre de las columnas y seleccionar las que necesitamos
+
+```{r}
+names(campanas)
+```
+
+En el caso que hubiera más variables, se pueden seleccionar las variables que queremos con select() y se asignan a un objeto, en este caso seguimos con el objeto "campanas". Las varibles dirección y materiales no nos interesa por el momento y las dejaremos afuera de la asignación del objeto. Es decir, seleccionamos del objeto campanas, las variables barrio y Comuna, asignando dichas variables al objeto campanas. Como el objeto es el mismo, solo queda las variables seleccionadas.
+
+```{r}
+campanas <- select(campanas, barrio, Comuna)
+```
+
+Pedimos el encabezado del nuevo objeto "campanas" para corrobrar los cambios, indicamos con n=3 que solo queremos ver las 3primeras observaciones o filas.
+
+```{r}
+head(campanas, n=3)
+```
+
+Creamos un nuevo objeto llamado "por_comuna", agruparemos usando la función group_by por la variable "Comuna", luego con summarise contaremos la cantidad de campanas por comuna y la ordenaremos con arrange desde la que tiene menor cantidad a la que tiene mayor cantidad de campanas por comuna:
+
+```{r}
+por_comuna <- campanas %>%
+  group_by(Comuna) %>% 
+  summarise(Cant_por_comuna = n()) %>% 
+  arrange(Cant_por_comuna)
+por_comuna
+```
+
+
+Aquí ya comenzamos a ver las primeras observaciones, la Comuna 12 y 13, tienen 331 campanas siendo ambas Comunas las de mayor cantidad. Por el otro extremo, la Comuna 1 tiene solo 85 campanas verdes.
+
+
+
+Creamos un nuevo objeto llamado "por_barrio" donde asignaremos la cantidad de campanas verdes por barrio, aquí ordenaremos de manera inversa, es decir de mayor a menor con la función desc dentro de arrange y mostramos los 3 barrios con mayor cantidad de campanas:
+
+```{r}
+por_barrio <- campanas |> 
+  group_by(barrio) |> 
+  summarise(Cant_por_barrio = n()) |> 
+  arrange(desc(Cant_por_barrio))
+head(por_barrio, n=3)
+```
+
+Ahora mostramos los 3 barrios con menor cantidad de campanas verdes:
+```{r}
+tail(por_barrio, n=3)
+
+```
+
+Teniendo agrupado por barrio, podemos sacar la cantidad de campanas promedio, redondeamos la cantidad.
+
+```{r}
+round(mean(por_barrio$Cant_por_barrio))
+```
+
+Graficamos la cantidad de campanas por Comuna, usamos varias opciones para demostrar el potencial que tiene ggplot. Se agregaron colores a los rellenos, al tema de fondo, bordes tanto color como ancho, las comunas se pasaron en sentido horizontal
+
+```{r, warning=FALSE}
+ggplot(campanas)+
+  geom_bar(mapping = aes(x= Comuna, fill = Comuna))+
+  ylab("Campanas verdes")+
+  
+  theme(panel.border = element_rect(fill = "transparent", # Necesario para agregar el borde
+                                    color = 3,            # Color del borde
+                                    size = 2))+           # Ancho del borde
+  theme(plot.background = element_rect(color = "black", # Color del borde
+                                       size = 2))+       # Ancho del borde
+  coord_flip() #para cambiar los ejes 
+
+```
+
+
+Podemos observar que las comunas 2 3 y 1 son las que menor cantidad de campanas verdes poseen. y las comunas 12 y 13 las de mayor cantidad.
+A su vez, podemos observar que hay una gran disparidad de campanas asignadas a cada comuna.
+
+
+
+Sigamos investigando como se distribuyen las campanas por cada barrio en la comuna, para saber dentro de cada comuna, cual es el barrio con la mayor y menor candidad de campanas. Observe que primero agrupamos por Comuna y luego que hemos usado en este caso [which.max(n)] para que cuadno saque el max(n) de campanas y min(n), nos traiga el nombre de ese barrio. 
+
+
+```{r}
+campanas %>%
+  group_by(Comuna) %>%
+  add_count(barrio) %>%
+   summarise(Mayor_cant_barrio = barrio[which.max(n)],
+            Mayor_cant = max(n),
+            Menor_cant_barrio = barrio[which.min(n)],
+            Menor_cant = min(n))
+```
+
+Con el resultado de este agrupamiento podemos ver como en la comuna 1 que es la de menor candidad de campanas asignadas, al subdividirlo por barrios, notamos que el barrio con mayor cantidad de campanas es Constitución con 41 campanas, y el barrio con menor cantidad es Puerto Madero con 6 campanas.
+
+Por el lado de la comuna con mayor cantidad de campanas, que son las Comuna 12 y 13, subdividiendo por barrios tenemos que en la comuna 12, Villa Urquiza lidera con 137 campanas y en la comuna 13 lidera Belgrano con 169 campanas. Mientras que en dichas comunas, los barrios con menor cantidad son Coghlan 21 campanas y Colegiales 55 campanas respectivamente. 
+
+Ahora queremos incluir en el análisis, los datos de la población por Comuna. Para ésto nos basamos en la información brindada por el CENSO2022
+
+### Importamos el archivo de censo
+
+Pasamos a importar el archivo .csv con los datos de la población del censo 2022 de CABA. 
+Se obtiene el archivo de la página oficial del [CENSO 2022](https://censo.gob.ar/index.php/datos_provisionales/) Sección "Descargar cuadros de resultados provisionales del CENSO 2022 en xlsx"
+Una vez bajado al disco, obtenemos la solapa del Cuadro 1.1 con los datos de CABA. Directamente copiamos los datos con las columnas necesarias.
+Para trabajar en R, usamos read.csv. el nombre del archivo va entre comillas, como tiene encabezado usamos la función header = T. El separador usamos la función sep="," para indicar que los datos del archivo csv están separados por ","
+
+```{r}
+censo <- read.csv("censocaba2022.csv", header = T, sep = ",")
+
+```
+
+```{r}
+str(censo) #
+head(censo, n=3)
+```
+
+#### Se realizan cambios en las variables
+
+Cambiamos el nombre de las variables para facilitar el trabajo.
+
+```{r}
+censo <- mutate(censo, viviparti = Total.de.viviendas.particulares)
+censo <- mutate(censo, vivicole = Total.de.viviendas.colectivas)
+censo <- mutate(censo, poblacion = Total.de.población)
+#View(censo)
+```
+
+Se suma en la variable "vivienda" las cantidades de viviendas particulares y viviendas colectivas
+
+```{r}
+censo <- mutate(censo, vivienda = viviparti + vivicole)
+```
+
+Sacamos las variables innecesarias, y con select, dejamos Comuna, vivienda y población, asignado en "censo"
+
+```{r}
+censo <- select(censo, Comuna, vivienda, poblacion)
+
+```
+
+Realizamos la unión de las bases de por_comuna y censo, uniéndolas por la variable en común "Comuna", asignando en "comunaycenso"
+
+```{r}
+comunaycenso <- por_comuna %>% 
+  left_join(censo, by = "Comuna")
+comunaycenso
+```
+
+
+## grafica de población por comuna. 
+```{r}
+ggplot(comunaycenso, mapping = aes(x = Comuna, y = poblacion)) +
+  geom_col(fill= "#58D68D") + #color hex
+  coord_flip() + #rota los ejes x e y
+  theme_classic() + #deja el fondo del grafico en blanco
+  scale_y_continuous(labels = scales::comma) + #muestra los números en miles
+  theme(axis.text.x = element_text(angle = 45))+ #inclina el nombre en el eje x
+  labs(title = "Población por Comuna",
+       subtitle = "Censo 2022")+
+       ylab("Población en miles")
+```
+
+
+
+
+Ahora veamos el impacto de la cantidad de campanas verdes con la cantidad de población y viviendas. 
+En primer lugar veamos la relación de las campanas en relación a la cantidad de viviendas según el censo del 2022. Y lo ordenamos según la relación viviendas /campanas
+```{r}
+comunaycenso <- comunaycenso |>
+  mutate(viv_cant = round(vivienda/Cant_por_comuna)) |> 
+  arrange(viv_cant)
+
+head(comunaycenso, n=3)
+```
+
+
+Observamos que la comuna 9 tiene 1 campana cada 274 viviendas. 
+
+
+En segundo lugar veamos la relación de la cantidad de campanas en relación a la cantidad de personas según el censo del 2022. Y lo ordenamos según la relación población /campanas
+```{r}
+comunaycenso <- comunaycenso |>
+  mutate(pob_cant = round(poblacion/Cant_por_comuna)) |> 
+  arrange(pob_cant)
+
+head(comunaycenso, n=3)
+```
+
+```{r}
+tail(comunaycenso, n=3)
+
+```
+
+Esto nos muestra que en esta relación, teniendo la cantidad de personas por campana, la comuna 10 es la que tiene la menor relación, con un total de 588 personas promedio por campana. Por el otro extremo, tenemos la comuna 14 con un promedio de 1 campana cada 2058 personas.
+
+
+
+Pasemos al gráfico para visualizarlo 
+```{r}
+ggplot(data = comunaycenso, mapping = aes(x = Comuna, y = pob_cant))+
+  geom_col(fill="#58D68D")+
+    coord_flip()+
+  labs(title = "Relación de la población por campana en cada comuna", 
+       caption = "Reciclemos",
+       x="Comuna",
+       y="Personas / campanas")+
+  theme_classic()
+
+
+```
+
+
+Este gráfico nos permite observar claramente la disparidad promedo de campana por persona en cada Comuna. Desde los 588 en la comuna 10 a los 2058 en la comuna 14.
+
+
+##### Aclaración importante: 
+Los datos son en base a los informado por el GCBA en su página oficial de datos abierto, la última actualizacion es de 2021. En su nueva web indica que hay 4576 campanas verdes, pero no se puede acceder al listado de las direcciones.
+Por otro lado, el listado de población indica la cantidad de viviendas, sin contar los negocios ni oficinas, que pueden tener otro tipo de circuito para los reciclables. 
+
+
+### Donde terminan tus reciclables?
+
+<https://buenosaires.gob.ar/centro-de-reciclaje-de-la-ciudad>
+
+#### Planta de orgánicos
+
+La planta de orgánicos trata 30 toneladas diarias de restos orgánicos que, gracias al proceso de fermentación aeróbica, se transforman en enmienda orgánica.
+
+#### ¿Dónde terminan tus reciclables?
+
+Todos los materiales recolectados van a los 16 Centros Verdes que tiene la Ciudad. Ahí las cooperativas de recuperadores le agregan valor a los reciclables con clasificación y procesamiento, para luego volver a la industria. [ciudadverde](https://ciudadverde.gob.ar/)
